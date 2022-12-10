@@ -1,6 +1,7 @@
-import { extendConfig, extendEnvironment } from "hardhat/config";
+import { execSync } from "child_process";
+import { extendConfig, extendEnvironment, task } from "hardhat/config";
 import { lazyObject } from "hardhat/plugins";
-import { HardhatConfig, HardhatUserConfig } from "hardhat/types";
+import { HardhatConfig, HardhatUserConfig, NotifierConfig } from "hardhat/types";
 import path from "path";
 
 import { ExampleHardhatRuntimeEnvironmentField } from "./ExampleHardhatRuntimeEnvironmentField";
@@ -8,42 +9,75 @@ import { ExampleHardhatRuntimeEnvironmentField } from "./ExampleHardhatRuntimeEn
 // extensions in your npm package's types file.
 import "./type-extensions";
 
+const sendNotification = (
+  title = "",
+  subtitle = "",
+  message = "",
+  sound = ""
+) => {
+  const command =
+    `osascript -e` +
+    `'` +
+    `display notification ` +
+    `"${message}"` +
+    ` with title "${title}"` +
+    ` subtitle "${subtitle}"` +
+    (sound ? ` sound name "${sound}"` : ``) +
+    `'`;
+  execSync(command);
+};
+
 extendConfig(
   (config: HardhatConfig, userConfig: Readonly<HardhatUserConfig>) => {
-    // We apply our default config here. Any other kind of config resolution
-    // or normalization should be placed here.
-    //
-    // `config` is the resolved config, which will be used during runtime and
-    // you should modify.
-    // `userConfig` is the config as provided by the user. You should not modify
-    // it.
-    //
-    // If you extended the `HardhatConfig` type, you need to make sure that
-    // executing this function ensures that the `config` object is in a valid
-    // state for its type, including its extensions. For example, you may
-    // need to apply a default value, like in this example.
-    const userPath = userConfig.paths?.newPath;
-
-    let newPath: string;
-    if (userPath === undefined) {
-      newPath = path.join(config.paths.root, "newPath");
-    } else {
-      if (path.isAbsolute(userPath)) {
-        newPath = userPath;
-      } else {
-        // We resolve relative paths starting from the project's root.
-        // Please keep this convention to avoid confusion.
-        newPath = path.normalize(path.join(config.paths.root, userPath));
-      }
+    const { notifier } = userConfig;
+    const n: NotifierConfig = {
+      playSuccessSound: true,
+      playFailureSound: true,
+      notifyOnSuccess: true,
+      notifyOnFailure: true,
+    };
+    if (notifier?.playSuccessSound === false) {
+      n.playSuccessSound = false;
     }
-
-    config.paths.newPath = newPath;
+    if (notifier?.playFailureSound === false) {
+      n.playFailureSound = false;
+    }
+    if (notifier?.notifyOnSuccess === false) {
+      n.notifyOnSuccess = false;
+    }
+    if (notifier?.notifyOnFailure === false) {
+      n.notifyOnFailure = false;
+    }
+    config.notifier = n;
   }
 );
 
-extendEnvironment((hre) => {
-  // We add a field to the Hardhat Runtime Environment here.
-  // We use lazyObject to avoid initializing things until they are actually
-  // needed.
-  hre.example = lazyObject(() => new ExampleHardhatRuntimeEnvironmentField());
-});
+extendEnvironment((hre) => {});
+
+task("compile", "Compiles project, builds artifacts & then notifies").setAction(
+  async (taskArgs, hre, runSuper) => {
+    const { config } = hre;
+    const { notifier } = config;
+    try {
+      await runSuper(taskArgs);
+      if (notifier.notifyOnSuccess) {
+        sendNotification(
+          "Sidekik Notifier",
+          "Compile Successful",
+          "🎉🥳🎉🥳",
+          notifier.playSuccessSound ? "Tink" : ""
+        );
+      }
+    } catch (e) {
+      console.log(e);
+      if (notifier.notifyOnFailure) {
+        sendNotification(
+          "Sidekik Notifier",
+          "Compile Error",
+          "🚥✋🔥😬",
+          notifier.playFailureSound ? "Submarine" : ""
+        );
+      }
+    }
+  }
+);

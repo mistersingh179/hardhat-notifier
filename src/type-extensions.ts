@@ -23,6 +23,22 @@ declare module "hardhat/types/config" {
   export interface ProjectPathsConfig {
     newPath: string;
   }
+
+  export interface NotifierConfig {
+    playSuccessSound?: boolean;
+    playFailureSound?: boolean;
+    notifyOnSuccess?: boolean;
+    notifyOnFailure?: boolean;
+  }
+
+  export interface HardhatConfig {
+    notifier: NotifierConfig;
+  }
+
+  // User facing config
+  export interface HardhatUserConfig {
+    notifier?: NotifierConfig;
+  }
 }
 
 declare module "hardhat/types/runtime" {
@@ -32,3 +48,10 @@ declare module "hardhat/types/runtime" {
     example: ExampleHardhatRuntimeEnvironmentField;
   }
 }
+
+declare function sendNotification(
+  title: any,
+  subtitle: any,
+  message: any,
+  sound: any
+): void;
